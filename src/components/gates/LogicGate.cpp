@@ -62,7 +62,6 @@ void LogicGate::evaluate()
 {
     vector<LogicState> inputStates = readInputStates();
 
-    // If any input is UNDEFINED, output is immediately UNDEFINED
     bool hasUndefined = false;
     for (int i = 0; i < (int)inputStates.size(); i++)
     {
@@ -73,46 +72,17 @@ void LogicGate::evaluate()
         }
     }
 
-    LogicState result;
-
     if (hasUndefined)
     {
-        result = LogicState::UNDEFINED;
+        outputState = LogicState::UNDEFINED;
     }
     else
     {
-        result = evaluateLogic(inputStates);
+        outputState = evaluateLogic(inputStates);
     }
 
-    // Apply propagation delay:
-    // Store the pending result and only commit it after the delay has elapsed.
-    // For simplicity in this project the SimulationEngine passes delta time
-    // and we accumulate it here.
-    if (result != outputState)
-    {
-        if (!hasPendingOutput)
-        {
-            hasPendingOutput   = true;
-            pendingOutputState = result;
-            pendingDelayMs     = 0.0;
-        }
-    }
-
-    // Commit pending output if delay has elapsed
-    // (SimulationEngine calls evaluate() once per tick — delay is approximated)
-    if (hasPendingOutput)
-    {
-        pendingDelayMs += 1.0;   // each evaluate() call = ~1ms simulation tick
-
-        if (pendingDelayMs >= propagationDelayMs)
-        {
-            writeOutputState(pendingOutputState);
-            hasPendingOutput = false;
-            pendingDelayMs   = 0.0;
-        }
-    }
+    writeOutputState(outputState);
 }
-
 
 // ---- serialize() ----
 

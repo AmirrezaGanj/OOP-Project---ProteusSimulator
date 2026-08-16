@@ -25,36 +25,33 @@ SimulationEngine::SimulationEngine(Circuit& circuit, SimulationClock& clock)
 
 void SimulationEngine::update()
 {
-    // If clock was STOPPED last frame and is still STOPPED, nothing to do
-    if (clock.isStopped())
-    {
-        return;
-    }
+    if (clock.isStopped()) return;
 
-    // Ask the clock to advance one tick.
-    // tick() returns true only when RUNNING — not when PAUSED.
     bool shouldEvaluate = clock.tick();
+    if (!shouldEvaluate) return;
 
-    if (!shouldEvaluate)
-    {
-        // PAUSED — wires keep their current colors but nothing changes
-        return;
-    }
-
-    // ---- Run the full evaluation cycle ----
-    // We repeat the pass EVALUATION_PASSES times so that cascaded
-    // gate chains (e.g. AND -> OR -> NOT) all settle in one tick.
+    // ---- Run the full evaluation cycle iteratively ----
     for (int pass = 0; pass < EVALUATION_PASSES; pass++)
     {
+        vector<Component*>& components = circuit.getComponents();
+        for (int i = 0; i < (int)components.size(); i++)
+        {
+            components[i]->resetPins();
+        }
+
         evaluateSources();
         propagateWires();
+
+        evaluateInteractive();
+        propagateWires();
+
         evaluateGates();
         propagateWires();
+
         evaluateInteractive();
         propagateWires();
     }
 
-    // After all passes, update wire voltage values for color animation
     updateWireVoltages();
 }
 
@@ -93,26 +90,38 @@ void SimulationEngine::stop()
 
 void SimulationEngine::stepOnce()
 {
-    // Make sure we are at least in a paused state before stepping
     if (clock.isStopped())
     {
         clearLog();
         log("Step mode — simulation started.");
         resetAllComponents();
         clock.run();
-        clock.pause();  // immediately pause so stepOnce controls it
+        clock.pause();
     }
 
-    // Run one full evaluation cycle
-    evaluateSources();
-    propagateWires();
-    evaluateGates();
-    propagateWires();
-    evaluateInteractive();
-    propagateWires();
-    updateWireVoltages();
+    for (int pass = 0; pass < EVALUATION_PASSES; pass++)
+    {
+        vector<Component*>& components = circuit.getComponents();
+        for (int i = 0; i < (int)components.size(); i++)
+        {
+            components[i]->resetPins();
+        }
 
-    clock.stepOnce();   // advances tick count by 1, stays PAUSED
+        evaluateSources();
+        propagateWires();
+
+        evaluateInteractive();
+        propagateWires();
+
+        evaluateGates();
+        propagateWires();
+
+        evaluateInteractive();
+        propagateWires();
+    }
+
+    updateWireVoltages();
+    clock.stepOnce();
 
     log("Step: tick " + to_string(clock.getTickCount()));
 }
